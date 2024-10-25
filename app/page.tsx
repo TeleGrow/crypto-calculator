@@ -1,101 +1,150 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+import { useState, useEffect, ChangeEvent } from 'react'
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+interface CryptoData {
+  date: string
+  price: string
 }
+
+interface CurrentPrices {
+  [key: string]: number
+}
+
+const CryptoCalculator = () => {
+  const [cryptoData, setCryptoData] = useState<{ [key: string]: CryptoData[] }>({})
+  const [currentPrices, setCurrentPrices] = useState<CurrentPrices>({})
+  const [selectedCrypto, setSelectedCrypto] = useState<string>('BTC')
+  const [purchaseDate, setPurchaseDate] = useState<string>('')
+  const [amount, setAmount] = useState<string>('')
+  const [result, setResult] = useState<{
+    amountPurchased: number
+    currentValue: number
+    profitLoss: number
+    profitLossPercentage: number
+  } | null>(null)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const cryptos = ['BTC', 'SOL', 'ETHER', 'BNB']
+      const data: { [key: string]: CryptoData[] } = {}
+      
+      for (const crypto of cryptos) {
+        const response = await fetch(`/data/${crypto.toLowerCase()}.json`)
+        data[crypto] = await response.json()
+      }
+      
+      setCryptoData(data)
+
+      const pricesResponse = await fetch('/data/current-prices.json')
+      setCurrentPrices(await pricesResponse.json())
+    }
+
+    fetchData()
+  }, [])
+
+  const calculateInvestment = () => {
+    const historicalData = cryptoData[selectedCrypto]
+    const purchasePrice = historicalData.find(data => {
+      const [month, day, year] = data.date.split('/')
+      const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+      return formattedDate === purchaseDate
+    })
+
+    if (!purchasePrice) {
+      alert('No historical data available for the selected date.')
+      return
+    }
+
+    const amountPurchased = parseFloat(amount) / parseFloat(purchasePrice.price)
+    const currentValue = amountPurchased * currentPrices[selectedCrypto]
+    const profitLoss = currentValue - parseFloat(amount)
+    const profitLossPercentage = (profitLoss / parseFloat(amount)) * 100
+
+    setResult({
+      amountPurchased,
+      currentValue,
+      profitLoss,
+      profitLossPercentage
+    })
+  }
+
+  const handlePurchaseDateChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setPurchaseDate(e.target.value)
+  }
+
+  const handleAmountChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setAmount(e.target.value)
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center">Crypto Calculator</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Cryptocurrency</label>
+              <Select onValueChange={setSelectedCrypto} defaultValue={selectedCrypto}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Cryptocurrency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BTC">BTC</SelectItem>
+                  <SelectItem value="SOL">SOL</SelectItem>
+                  <SelectItem value="ETHER">ETHER</SelectItem>
+                  <SelectItem value="BNB">BNB</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label htmlFor="purchaseDate" className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label>
+              <Input
+                type="date"
+                id="purchaseDate"
+                value={purchaseDate}
+                onChange={handlePurchaseDateChange}
+              />
+            </div>
+            <div>
+              <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">Amount (USD)</label>
+              <Input
+                type="number"
+                id="amount"
+                value={amount}
+                onChange={handleAmountChange}
+                placeholder="Enter amount in USD"
+              />
+            </div>
+            <Button onClick={calculateInvestment} className="w-full">Calculate</Button>
+          </div>
+          {result && (
+            <div className="mt-4 space-y-2">
+              <p><strong>Amount of crypto purchased:</strong> {result.amountPurchased.toFixed(8)} {selectedCrypto}</p>
+              <p><strong>Current value:</strong> ${result.currentValue.toFixed(2)}</p>
+              <p>
+                <strong>
+                  {result.profitLoss >= 0 ? (
+                    <span className="text-green-600">Profit:</span>
+                  ) : (
+                    <span className="text-red-600">Loss:</span>
+                  )}
+                </strong>
+                {' '}
+                {Math.abs(result.profitLossPercentage).toFixed(2)}% (${Math.abs(result.profitLoss).toFixed(2)})
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+export default CryptoCalculator
