@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 
 interface CryptoData {
   date: string
-  price: string
+  price: number
 }
 
 interface CurrentPrices {
@@ -17,7 +17,12 @@ interface CurrentPrices {
 
 const CryptoCalculator = () => {
   const [cryptoData, setCryptoData] = useState<{ [key: string]: CryptoData[] }>({})
-  const [currentPrices, setCurrentPrices] = useState<CurrentPrices>({})
+  const [currentPrices, setCurrentPrices] = useState<CurrentPrices>({
+    BTC: 69000,
+    BNB: 595,
+    SOL: 175,
+    ETHER: 2523
+  })
   const [selectedCrypto, setSelectedCrypto] = useState<string>('BTC')
   const [purchaseDate, setPurchaseDate] = useState<string>('')
   const [amount, setAmount] = useState<string>('')
@@ -27,40 +32,62 @@ const CryptoCalculator = () => {
     profitLoss: number
     profitLossPercentage: number
   } | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
       const cryptos = ['BTC', 'SOL', 'ETHER', 'BNB']
       const data: { [key: string]: CryptoData[] } = {}
       
-      for (const crypto of cryptos) {
-        const response = await fetch(`/data/${crypto.toLowerCase()}.json`)
-        data[crypto] = await response.json()
+      try {
+        for (const crypto of cryptos) {
+          const response = await fetch(`/data/${crypto.toLowerCase()}.json`)
+          if (!response.ok) {
+            throw new Error(`Failed to fetch data for ${crypto}`)
+          }
+          data[crypto] = await response.json()
+        }
+        setCryptoData(data)
+        setIsLoading(false)
+      } catch (err) {
+        console.error('Error fetching crypto data:', err)
+        setError('Failed to load crypto data. Please try again later.')
+        setIsLoading(false)
       }
-      
-      setCryptoData(data)
-
-      const pricesResponse = await fetch('/data/current-prices.json')
-      setCurrentPrices(await pricesResponse.json())
     }
 
     fetchData()
   }, [])
 
   const calculateInvestment = () => {
+    if (isLoading) {
+      alert('Crypto data is still loading. Please wait.')
+      return
+    }
+
+    if (error) {
+      alert('There was an error loading the crypto data. Please try again later.')
+      return
+    }
+
+    if (!cryptoData[selectedCrypto]) {
+      alert('No data available for the selected cryptocurrency.')
+      return
+    }
+
     const historicalData = cryptoData[selectedCrypto]
-    const purchasePrice = historicalData.find(data => {
-      const [month, day, year] = data.date.split('/')
-      const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-      return formattedDate === purchaseDate
-    })
+    const [year, month, day] = purchaseDate.split('-')
+    const formattedDate = `${month}/01/${year}`
+
+    const purchasePrice = historicalData.find(data => data.date === formattedDate)
 
     if (!purchasePrice) {
       alert('No historical data available for the selected date.')
       return
     }
 
-    const amountPurchased = parseFloat(amount) / parseFloat(purchasePrice.price)
+    const amountPurchased = parseFloat(amount) / purchasePrice.price
     const currentValue = amountPurchased * currentPrices[selectedCrypto]
     const profitLoss = currentValue - parseFloat(amount)
     const profitLossPercentage = (profitLoss / parseFloat(amount)) * 100
@@ -79,6 +106,14 @@ const CryptoCalculator = () => {
 
   const handleAmountChange = (e: ChangeEvent<HTMLInputElement>) => {
     setAmount(e.target.value)
+  }
+
+  if (isLoading) {
+    return <div>Loading crypto data...</div>
+  }
+
+  if (error) {
+    return <div>{error}</div>
   }
 
   return (
